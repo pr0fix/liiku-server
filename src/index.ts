@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import "dotenv/config";
+import transitRouter from "./routes/transit";
 import { PORT } from "./utils/constants";
 
 const app = express();
@@ -11,6 +12,8 @@ app.use(express.json());
 app.get("/ping", (_req: Request, res: Response) => {
   res.send("pong");
 });
+
+app.use("/api", transitRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
