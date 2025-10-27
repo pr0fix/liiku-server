@@ -1,8 +1,8 @@
-import GtfsRealtimeBindings from "gtfs-realtime-bindings";
+import GtfsRealtimeBindings, { transit_realtime } from "gtfs-realtime-bindings";
 import axios from "axios";
 import { REALTIME_API_URL } from "../utils/constants";
 
-const fetchRealtimeData = async () => {
+const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
     const response = await axios({
       method: "get",
