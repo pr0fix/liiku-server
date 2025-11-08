@@ -9,10 +9,6 @@ const app = express();
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 
-app.get("/ping", (_req: Request, res: Response) => {
-  res.send("pong");
-});
-
 app.use("/api", transitRouter);
 
 app.listen(PORT, () => {
