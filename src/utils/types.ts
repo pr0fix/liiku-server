@@ -2,6 +2,7 @@ interface VehicleInfo {
   vehicleId: string;
   routeId: string;
   routeName: string;
+  routeLongName: string;
   directionId: number;
   headsign: string;
   latitude: number;

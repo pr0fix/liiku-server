@@ -59,6 +59,7 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
         vehicleId: v.vehicle?.id || entity.id,
         routeId,
         routeName: route?.route_short_name || routeId,
+        routeLongName: route?.route_long_name || "",
         directionId: v.trip?.directionId || 0,
         headsign: trip?.trip_headsign || "",
         latitude: v.position?.latitude || 0,

@@ -30,7 +30,6 @@ router.get(
   ): Promise<void> => {
     try {
       const data = await transitService.fetchRealtimeData();
-      
       res.json(data);
     } catch (error) {
       console.error("Error fetching vehicle positions:", error);
