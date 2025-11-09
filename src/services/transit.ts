@@ -55,6 +55,10 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
       const stop = gtfsService.getStop(stopId);
       const trip = gtfsService.getTrip(routeId, directionId);
 
+      const occupancyStatus = v.occupancyStatus
+        ? transit_realtime.VehiclePosition.OccupancyStatus[v.occupancyStatus]
+        : "UNKNOWN";
+
       vehicles.push({
         vehicleId: v.vehicle?.id || entity.id,
         routeId,
@@ -70,7 +74,7 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
         stopId,
         stopName: stop?.stop_name || "",
         currentStatus: v.currentStatus?.toString() || "",
-        occupancyStatus: v.occupancyStatus?.toString() || "UNKNOWN",
+        occupancyStatus: occupancyStatus,
         startTime: v.trip?.startTime?.toString() || "",
       });
     }
