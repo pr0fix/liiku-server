@@ -7,6 +7,7 @@ class GtfsService {
   private routes: Map<string, Route> = new Map();
   private stops: Map<string, Stop> = new Map();
   private trips: Map<string, Trip> = new Map();
+  private tripsByRouteDirection: Map<string, Trip> = new Map();
 
   constructor() {
     this.loadData();
@@ -52,6 +53,13 @@ class GtfsService {
     }) as Trip[];
     trips.forEach((trip) => {
       this.trips.set(trip.trip_id, trip);
+
+      // Create composite key for route + direction lookup for better performance
+      const compositeKey = `${trip.route_id}:${trip.direction_id}`;
+      // Store the first trip found for this route+direction combination
+      if (!this.tripsByRouteDirection.has(compositeKey)) {
+        this.tripsByRouteDirection.set(compositeKey, trip);
+      }
     });
 
     console.log(
@@ -68,15 +76,8 @@ class GtfsService {
   }
 
   getTrip(routeId: string, directionId: number): Trip | undefined {
-    for (const trip of this.trips.values()) {
-      if (
-        trip.route_id === routeId &&
-        parseInt(trip.direction_id) === directionId
-      ) {
-        return trip;
-      }
-    }
-    return undefined;
+    const compositeKey = `${routeId}:${directionId}`;
+    return this.tripsByRouteDirection.get(compositeKey);
   }
 }
 
