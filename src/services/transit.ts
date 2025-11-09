@@ -5,8 +5,8 @@ import gtfsService from "./gtfsService";
 import { VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
 
-const translateOccupancyStatus = (status: string): string => {
-  const occupancyMap: Record<string, string> = {
+const translateOccupancyStatus = (status: string): string | null => {
+  const occupancyMap: Record<string, string | null> = {
     EMPTY: "Empty",
     MANY_SEATS_AVAILABLE: "Many seats available",
     FEW_SEATS_AVAILABLE: "Few seats available",
@@ -14,11 +14,11 @@ const translateOccupancyStatus = (status: string): string => {
     CRUSHED_STANDING_ROOM_ONLY: "Crushed standing room only",
     FULL: "Full",
     NOT_ACCEPTING_PASSENGERS: "Not accepting passengers",
-    NO_DATA_AVAILABLE: "No data available",
+    NO_DATA_AVAILABLE: null,
     NOT_BOARDABLE: "Not boardable",
-    UNKNOWN: "Unknown",
+    UNKNOWN: null,
   };
-  return occupancyMap[status] || status;
+  return occupancyMap[status] !== undefined ? occupancyMap[status] : null;
 };
 
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
