@@ -5,6 +5,22 @@ import gtfsService from "./gtfsService";
 import { VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
 
+const translateOccupancyStatus = (status: string): string => {
+  const occupancyMap: Record<string, string> = {
+    EMPTY: "Empty",
+    MANY_SEATS_AVAILABLE: "Many seats available",
+    FEW_SEATS_AVAILABLE: "Few seats available",
+    STANDING_ROOM_ONLY: "Standing room only",
+    CRUSHED_STANDING_ROOM_ONLY: "Crushed standing room only",
+    FULL: "Full",
+    NOT_ACCEPTING_PASSENGERS: "Not accepting passengers",
+    NO_DATA_AVAILABLE: "No data available",
+    NOT_BOARDABLE: "Not boardable",
+    UNKNOWN: "Unknown",
+  };
+  return occupancyMap[status] || status;
+};
+
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
     const response = await axios({
@@ -74,7 +90,7 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
         stopId,
         stopName: stop?.stop_name || "",
         currentStatus: v.currentStatus?.toString() || "",
-        occupancyStatus: occupancyStatus,
+        occupancyStatus: translateOccupancyStatus(occupancyStatus),
         startTime: v.trip?.startTime?.toString() || "",
       });
     }
