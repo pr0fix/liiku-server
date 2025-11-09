@@ -93,12 +93,14 @@ async function sendInitialData(ws: WebSocket) {
     );
   } catch (error) {
     console.error("Error sending initial data:", error);
-    ws.send(
-      JSON.stringify({
-        type: "error",
-        message: "Failed to fetch initial vehicle data",
-      })
-    );
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "Failed to fetch initial vehicle data",
+        })
+      );
+    }
   }
 }
 
