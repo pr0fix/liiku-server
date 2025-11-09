@@ -8,7 +8,7 @@ interface VehicleInfo {
   latitude: number;
   longitude: number;
   bearing: number;
-  speed: number;
+  speed: string;
   timestamp: string;
   stopId: string;
   stopName: string;

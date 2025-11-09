@@ -4,6 +4,7 @@ import { REALTIME_API_URL } from "../utils/constants";
 import gtfsService from "./gtfsService";
 import { VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
+import { formatKmh } from "../utils/helpers";
 
 const translateOccupancyStatus = (status: string): string | null => {
   const occupancyMap: Record<string, string | null> = {
@@ -31,15 +32,10 @@ const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
     });
 
     if (response.status !== 200) {
-      throw new TransitAPIError(
-        `API returned status ${response.status}`,
-        response.status
-      );
+      throw new TransitAPIError(`API returned status ${response.status}`, response.status);
     }
     const buffer = response.data;
-    const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(
-      new Uint8Array(buffer)
-    );
+    const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
     return feed;
   } catch (error) {
     console.error("Error fetching realtime data:", error);
@@ -48,11 +44,7 @@ const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
       throw error;
     }
 
-    throw new TransitAPIError(
-      "Failed to fetch realtime transit data",
-      503,
-      error as Error
-    );
+    throw new TransitAPIError("Failed to fetch realtime transit data", 503, error as Error);
   }
 };
 
@@ -66,7 +58,9 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
       const routeId = v.trip?.routeId || "";
       const stopId = v.stopId || "";
       const directionId = v.trip?.directionId || 0;
-
+      const speedMs = v.position?.speed || 0;
+      const speedKmhFormatted = formatKmh(speedMs);
+      
       const route = gtfsService.getRoute(routeId);
       const stop = gtfsService.getStop(stopId);
       const trip = gtfsService.getTrip(routeId, directionId);
@@ -85,7 +79,7 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
         latitude: v.position?.latitude || 0,
         longitude: v.position?.longitude || 0,
         bearing: v.position?.bearing || 0,
-        speed: v.position?.speed || 0,
+        speed: speedKmhFormatted,
         timestamp: v.timestamp?.toString() || "",
         stopId,
         stopName: stop?.stop_name || "",
