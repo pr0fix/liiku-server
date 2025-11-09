@@ -26,6 +26,7 @@ const findVehicleType = (routeType?: number | string): string => {
   if (routeType == null) return "unknown";
   const rt = typeof routeType === "string" ? Number(routeType) : routeType;
   if (Number.isNaN(rt)) return "unknown";
+  if (rt === 900) return "lightrail";
   if (rt >= 700 && rt < 800) return "bus";
   if (rt >= 100 && rt < 200) return "rail";
   if (rt === 0) return "tram";
