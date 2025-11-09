@@ -180,7 +180,12 @@ function broadcast(message: BroadcastMessage) {
   });
 }
 
-function handleClientMessage(ws: WebSocket, data: any) {
+interface ClientMessage {
+  type: "ping" | "subscribe" | string;
+  payload?: any;
+}
+
+function handleClientMessage(ws: WebSocket, data: ClientMessage) {
   switch (data.type) {
     case "ping":
       ws.send(JSON.stringify({ type: "pong" }));
