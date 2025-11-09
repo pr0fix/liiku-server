@@ -39,7 +39,7 @@ interface Trip {
   trip_id: string;
   route_id: string;
   trip_headsign: string;
-  direction_id: string;
+  direction_id: number;
 }
 
 export { VehicleInfo, Route, Stop, Trip };
