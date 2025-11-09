@@ -24,7 +24,7 @@ let previousVehicles: Map<string, VehicleInfo> = new Map();
 
 // Interval to detect dead connections
 const HEARTBEAT_INTERVAL = 30000;
-const UPDATE_INTERVAL = 1000;
+const UPDATE_INTERVAL = 10000;
 
 wss.on("connection", function connection(ws: ExtendedWebSocket) {
   console.log("New client connected");
