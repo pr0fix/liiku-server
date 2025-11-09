@@ -166,7 +166,12 @@ function hasVehicleChanged(prev: VehicleInfo, curr: VehicleInfo): boolean {
   );
 }
 
-function broadcast(message: any) {
+type BroadcastMessage =
+  | { type: "update"; data: { updated: VehicleInfo[]; added: VehicleInfo[]; removed: string[] }; timestamp: number }
+  | { type: "error"; message: string }
+  | { type: "initial"; data?: any; message?: string; timestamp?: number };
+
+function broadcast(message: BroadcastMessage) {
   const data = JSON.stringify(message);
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
