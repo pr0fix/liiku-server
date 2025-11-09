@@ -8,13 +8,14 @@ interface VehicleInfo {
   latitude: number;
   longitude: number;
   bearing: number;
-  speed: number;
+  speed: string;
   timestamp: string;
   stopId: string;
   stopName: string;
   currentStatus: string;
   occupancyStatus: string | null;
   startTime: string;
+  vehicleType: string
 }
 
 interface Route {

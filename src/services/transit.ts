@@ -4,6 +4,7 @@ import { REALTIME_API_URL } from "../utils/constants";
 import gtfsService from "./gtfsService";
 import { VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
+import { formatKmh } from "../utils/helpers";
 
 const translateOccupancyStatus = (status: string): string | null => {
   const occupancyMap: Record<string, string | null> = {
@@ -21,6 +22,19 @@ const translateOccupancyStatus = (status: string): string | null => {
   return occupancyMap[status] !== undefined ? occupancyMap[status] : null;
 };
 
+const findVehicleType = (routeType?: number | string): string => {
+  if (routeType == null) return "unknown";
+  const rt = typeof routeType === "string" ? Number(routeType) : routeType;
+  if (Number.isNaN(rt)) return "unknown";
+  if (rt >= 700 && rt < 800) return "bus";
+  if (rt >= 100 && rt < 200) return "rail";
+  if (rt === 0) return "tram";
+  if (rt === 1) return "metro";
+  if (rt === 4) return "ferry";
+
+  return "other";
+};
+
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
     const response = await axios({
@@ -31,15 +45,10 @@ const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
     });
 
     if (response.status !== 200) {
-      throw new TransitAPIError(
-        `API returned status ${response.status}`,
-        response.status
-      );
+      throw new TransitAPIError(`API returned status ${response.status}`, response.status);
     }
     const buffer = response.data;
-    const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(
-      new Uint8Array(buffer)
-    );
+    const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
     return feed;
   } catch (error) {
     console.error("Error fetching realtime data:", error);
@@ -48,11 +57,7 @@ const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
       throw error;
     }
 
-    throw new TransitAPIError(
-      "Failed to fetch realtime transit data",
-      503,
-      error as Error
-    );
+    throw new TransitAPIError("Failed to fetch realtime transit data", 503, error as Error);
   }
 };
 
@@ -66,10 +71,12 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
       const routeId = v.trip?.routeId || "";
       const stopId = v.stopId || "";
       const directionId = v.trip?.directionId || 0;
-
+      const speedMs = v.position?.speed || 0;
+      const speedKmhFormatted = formatKmh(speedMs);
       const route = gtfsService.getRoute(routeId);
       const stop = gtfsService.getStop(stopId);
       const trip = gtfsService.getTrip(routeId, directionId);
+      const vehicleType = findVehicleType(route?.route_type);
 
       const occupancyStatus = v.occupancyStatus
         ? transit_realtime.VehiclePosition.OccupancyStatus[v.occupancyStatus]
@@ -85,13 +92,14 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
         latitude: v.position?.latitude || 0,
         longitude: v.position?.longitude || 0,
         bearing: v.position?.bearing || 0,
-        speed: v.position?.speed || 0,
+        speed: speedKmhFormatted,
         timestamp: v.timestamp?.toString() || "",
         stopId,
         stopName: stop?.stop_name || "",
         currentStatus: v.currentStatus?.toString() || "",
         occupancyStatus: translateOccupancyStatus(occupancyStatus),
         startTime: v.trip?.startTime?.toString() || "",
+        vehicleType,
       });
     }
   });
