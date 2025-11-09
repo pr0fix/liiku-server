@@ -93,12 +93,14 @@ async function sendInitialData(ws: WebSocket) {
     );
   } catch (error) {
     console.error("Error sending initial data:", error);
-    ws.send(
-      JSON.stringify({
-        type: "error",
-        message: "Failed to fetch initial vehicle data",
-      })
-    );
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "Failed to fetch initial vehicle data",
+        })
+      );
+    }
   }
 }
 
@@ -164,7 +166,12 @@ function hasVehicleChanged(prev: VehicleInfo, curr: VehicleInfo): boolean {
   );
 }
 
-function broadcast(message: any) {
+type BroadcastMessage =
+  | { type: "update"; data: { updated: VehicleInfo[]; added: VehicleInfo[]; removed: string[] }; timestamp: number }
+  | { type: "error"; message: string }
+  | { type: "initial"; data?: any; message?: string; timestamp?: number };
+
+function broadcast(message: BroadcastMessage) {
   const data = JSON.stringify(message);
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
@@ -173,7 +180,12 @@ function broadcast(message: any) {
   });
 }
 
-function handleClientMessage(ws: WebSocket, data: any) {
+interface ClientMessage {
+  type: "ping" | "subscribe" | string;
+  payload?: any;
+}
+
+function handleClientMessage(ws: WebSocket, data: ClientMessage) {
   switch (data.type) {
     case "ping":
       ws.send(JSON.stringify({ type: "pong" }));
