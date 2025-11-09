@@ -5,6 +5,22 @@ import gtfsService from "./gtfsService";
 import { VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
 
+const translateOccupancyStatus = (status: string): string | null => {
+  const occupancyMap: Record<string, string | null> = {
+    EMPTY: "Empty",
+    MANY_SEATS_AVAILABLE: "Many seats available",
+    FEW_SEATS_AVAILABLE: "Few seats available",
+    STANDING_ROOM_ONLY: "Standing room only",
+    CRUSHED_STANDING_ROOM_ONLY: "Crushed standing room only",
+    FULL: "Full",
+    NOT_ACCEPTING_PASSENGERS: "Not accepting passengers",
+    NO_DATA_AVAILABLE: null,
+    NOT_BOARDABLE: "Not boardable",
+    UNKNOWN: null,
+  };
+  return occupancyMap[status] !== undefined ? occupancyMap[status] : null;
+};
+
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
     const response = await axios({
@@ -55,6 +71,10 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
       const stop = gtfsService.getStop(stopId);
       const trip = gtfsService.getTrip(routeId, directionId);
 
+      const occupancyStatus = v.occupancyStatus
+        ? transit_realtime.VehiclePosition.OccupancyStatus[v.occupancyStatus]
+        : "UNKNOWN";
+
       vehicles.push({
         vehicleId: v.vehicle?.id || entity.id,
         routeId,
@@ -70,7 +90,7 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
         stopId,
         stopName: stop?.stop_name || "",
         currentStatus: v.currentStatus?.toString() || "",
-        occupancyStatus: v.occupancyStatus?.toString() || "UNKNOWN",
+        occupancyStatus: translateOccupancyStatus(occupancyStatus),
         startTime: v.trip?.startTime?.toString() || "",
       });
     }

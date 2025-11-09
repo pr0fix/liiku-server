@@ -13,7 +13,7 @@ interface VehicleInfo {
   stopId: string;
   stopName: string;
   currentStatus: string;
-  occupancyStatus: string;
+  occupancyStatus: string | null;
   startTime: string;
 }
 
