@@ -1,17 +1,85 @@
 import express, { Request, Response } from "express";
 import transitService from "../services/transit";
+import { VehicleInfo } from "../utils/types";
 
 const router = express.Router();
 
+interface ErrorResponse {
+  error: string;
+  message: string;
+}
+
+interface SuccessResponse {
+  success: boolean;
+  count: number;
+  data: VehicleInfo[];
+}
+
+router.get("/health", (_req: Request, res: Response): Response => {
+  return res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 router.get(
-  "/transit-data",
-  async (_req: Request, res: Response): Promise<Response> => {
+  "/test",
+  async (
+    _req: Request,
+    res: Response
+  ): Promise<void> => {
     try {
       const data = await transitService.fetchRealtimeData();
-      return res.json(data);
+      res.json(data);
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ error: "Failed to fetch realtime data" });
+      console.error("Error fetching vehicle positions:", error);
+    }
+  }
+);
+
+router.get(
+  "/transit",
+  async (
+    _req: Request,
+    res: Response<SuccessResponse | ErrorResponse>
+  ): Promise<void> => {
+    try {
+      const data = await transitService.getVehiclePositions();
+      if (!data || data.length === 0) {
+        res.status(404).json({
+          error: "No vehicle data available",
+          message: "No active vehicles found at this time",
+        });
+        return;
+      }
+      res.json({ success: true, count: data.length, data: data });
+    } catch (error) {
+      console.error("Error fetching vehicle positions:", error);
+
+      if (error instanceof Error) {
+        if (
+          error.message.includes("ECONNREFUSED") ||
+          error.message.includes("ETIMEDOUT")
+        ) {
+          res.status(503).json({
+            error: "Service unavailable",
+            message: "Unable to connect to realtime data service",
+          });
+          return;
+        }
+
+        if (error.message.includes("404")) {
+          res.status(404).json({
+            error: "Data not found",
+            message: "Realtime data endpoint not available",
+          });
+          return;
+        }
+      }
+      res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to fetch realtime data",
+      });
     }
   }
 );
