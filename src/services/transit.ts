@@ -22,6 +22,19 @@ const translateOccupancyStatus = (status: string): string | null => {
   return occupancyMap[status] !== undefined ? occupancyMap[status] : null;
 };
 
+const findVehicleType = (routeType?: number | string): string => {
+  if (routeType == null) return "unknown";
+  const rt = typeof routeType === "string" ? Number(routeType) : routeType;
+  if (Number.isNaN(rt)) return "unknown";
+  if (rt >= 700 && rt < 800) return "bus";
+  if (rt >= 100 && rt < 200) return "rail";
+  if (rt === 0) return "tram";
+  if (rt === 1) return "metro";
+  if (rt === 4) return "ferry";
+
+  return "other";
+};
+
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
     const response = await axios({
@@ -60,10 +73,10 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
       const directionId = v.trip?.directionId || 0;
       const speedMs = v.position?.speed || 0;
       const speedKmhFormatted = formatKmh(speedMs);
-      
       const route = gtfsService.getRoute(routeId);
       const stop = gtfsService.getStop(stopId);
       const trip = gtfsService.getTrip(routeId, directionId);
+      const vehicleType = findVehicleType(route?.route_type);
 
       const occupancyStatus = v.occupancyStatus
         ? transit_realtime.VehiclePosition.OccupancyStatus[v.occupancyStatus]
@@ -86,6 +99,7 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
         currentStatus: v.currentStatus?.toString() || "",
         occupancyStatus: translateOccupancyStatus(occupancyStatus),
         startTime: v.trip?.startTime?.toString() || "",
+        vehicleType,
       });
     }
   });

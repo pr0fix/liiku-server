@@ -15,6 +15,7 @@ interface VehicleInfo {
   currentStatus: string;
   occupancyStatus: string | null;
   startTime: string;
+  vehicleType: string
 }
 
 interface Route {
