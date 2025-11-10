@@ -1,3 +1,5 @@
+import { WebSocket } from "ws";
+
 interface VehicleInfo {
   vehicleId: string;
   routeId: string;
@@ -15,7 +17,7 @@ interface VehicleInfo {
   currentStatus: string;
   occupancyStatus: string | null;
   startTime: string;
-  vehicleType: string
+  vehicleType: string;
 }
 
 interface Route {
@@ -43,4 +45,43 @@ interface Trip {
   direction_id: number;
 }
 
-export { VehicleInfo, Route, Stop, Trip };
+interface ExtendedWebSocket extends WebSocket {
+  isAlive: boolean;
+}
+
+type BroadcastMessage =
+  | {
+      type: "update";
+      data: { updated: VehicleInfo[]; added: VehicleInfo[]; removed: string[] };
+      timestamp: number;
+    }
+  | { type: "error"; message: string }
+  | { type: "initial"; data?: any; message?: string; timestamp?: number };
+
+interface ClientMessage {
+  type: "ping" | "subscribe" | string;
+  payload?: any;
+}
+
+interface ErrorResponse {
+  error: string;
+  message: string;
+}
+
+interface SuccessResponse {
+  success: boolean;
+  count: number;
+  data: VehicleInfo[];
+}
+
+export {
+  VehicleInfo,
+  Route,
+  Stop,
+  Trip,
+  ExtendedWebSocket,
+  BroadcastMessage,
+  ClientMessage,
+  ErrorResponse,
+  SuccessResponse,
+};

@@ -1,20 +1,9 @@
 import express, { Request, Response } from "express";
 import transitService from "../services/transit";
-import { VehicleInfo } from "../utils/types";
+import { ErrorResponse, SuccessResponse, VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
 
 const router = express.Router();
-
-interface ErrorResponse {
-  error: string;
-  message: string;
-}
-
-interface SuccessResponse {
-  success: boolean;
-  count: number;
-  data: VehicleInfo[];
-}
 
 router.get("/health", (_req: Request, res: Response): Response => {
   return res.json({
@@ -47,10 +36,7 @@ router.get("/test", async (_req: Request, res: Response): Promise<void> => {
 
 router.get(
   "/transit",
-  async (
-    _req: Request,
-    res: Response<SuccessResponse | ErrorResponse>
-  ): Promise<void> => {
+  async (_req: Request, res: Response<SuccessResponse | ErrorResponse>): Promise<void> => {
     try {
       const data = await transitService.getVehiclePositions();
 
@@ -75,10 +61,7 @@ router.get(
       }
 
       if (error instanceof Error) {
-        if (
-          error.message.includes("ECONNREFUSED") ||
-          error.message.includes("ETIMEDOUT")
-        ) {
+        if (error.message.includes("ECONNREFUSED") || error.message.includes("ETIMEDOUT")) {
           res.status(503).json({
             error: "Service unavailable",
             message: "Unable to connect to realtime data service",

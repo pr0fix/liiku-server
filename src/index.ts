@@ -5,11 +5,8 @@ import "dotenv/config";
 import transitRouter from "./routes/transit";
 import transitService from "./services/transit";
 import { PORT } from "./utils/constants";
-import { VehicleInfo } from "./utils/types";
-
-interface ExtendedWebSocket extends WebSocket {
-  isAlive: boolean;
-}
+import { BroadcastMessage, ClientMessage, ExtendedWebSocket, VehicleInfo } from "./utils/types";
+import { hasVehicleChanged } from "./utils/helpers";
 
 const app = express();
 const server = app.listen(PORT, () => {
@@ -85,12 +82,10 @@ process.on("SIGTERM", () => {
   server.close();
 });
 
-async function sendInitialData(ws: WebSocket) {
+const sendInitialData = async (ws: WebSocket) => {
   try {
     const vehicles = await transitService.getVehiclePositions();
-    ws.send(
-      JSON.stringify({ type: "initial", data: vehicles, timestamp: Date.now() })
-    );
+    ws.send(JSON.stringify({ type: "initial", data: vehicles, timestamp: Date.now() }));
   } catch (error) {
     console.error("Error sending initial data:", error);
     if (ws.readyState === WebSocket.OPEN) {
@@ -102,9 +97,9 @@ async function sendInitialData(ws: WebSocket) {
       );
     }
   }
-}
+};
 
-async function fetchAndBroadcastUpdates() {
+const fetchAndBroadcastUpdates = async () => {
   try {
     const vehicles = await transitService.getVehiclePositions();
     const currentVehicles = new Map(vehicles.map((v) => [v.vehicleId, v]));
@@ -134,11 +129,7 @@ async function fetchAndBroadcastUpdates() {
     });
 
     // Only broadcast if there are changes
-    if (
-      changes.updated.length > 0 ||
-      changes.added.length > 0 ||
-      changes.removed.length > 0
-    ) {
+    if (changes.updated.length > 0 || changes.added.length > 0 || changes.removed.length > 0) {
       broadcast({ type: "update", data: changes, timestamp: Date.now() });
 
       console.log(
@@ -153,39 +144,18 @@ async function fetchAndBroadcastUpdates() {
       message: "Failed to fetch vehicle updates",
     });
   }
-}
+};
 
-function hasVehicleChanged(prev: VehicleInfo, curr: VehicleInfo): boolean {
-  return (
-    prev.latitude !== curr.latitude ||
-    prev.longitude !== curr.longitude ||
-    prev.bearing !== curr.bearing ||
-    prev.speed !== curr.speed ||
-    prev.stopId !== curr.stopId ||
-    prev.currentStatus !== curr.currentStatus
-  );
-}
-
-type BroadcastMessage =
-  | { type: "update"; data: { updated: VehicleInfo[]; added: VehicleInfo[]; removed: string[] }; timestamp: number }
-  | { type: "error"; message: string }
-  | { type: "initial"; data?: any; message?: string; timestamp?: number };
-
-function broadcast(message: BroadcastMessage) {
+const broadcast = (message: BroadcastMessage) => {
   const data = JSON.stringify(message);
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(data);
     }
   });
-}
+};
 
-interface ClientMessage {
-  type: "ping" | "subscribe" | string;
-  payload?: any;
-}
-
-function handleClientMessage(ws: WebSocket, data: ClientMessage) {
+const handleClientMessage = (ws: WebSocket, data: ClientMessage) => {
   switch (data.type) {
     case "ping":
       ws.send(JSON.stringify({ type: "pong" }));
@@ -196,7 +166,7 @@ function handleClientMessage(ws: WebSocket, data: ClientMessage) {
     default:
       console.log("Unknown message type:", data.type);
   }
-}
+};
 
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());

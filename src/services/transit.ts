@@ -4,37 +4,7 @@ import { REALTIME_API_URL } from "../utils/constants";
 import gtfsService from "./gtfsService";
 import { VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
-import { formatKmh } from "../utils/helpers";
-
-const translateOccupancyStatus = (status: string): string | null => {
-  const occupancyMap: Record<string, string | null> = {
-    EMPTY: "Empty",
-    MANY_SEATS_AVAILABLE: "Many seats available",
-    FEW_SEATS_AVAILABLE: "Few seats available",
-    STANDING_ROOM_ONLY: "Standing room only",
-    CRUSHED_STANDING_ROOM_ONLY: "Crushed standing room only",
-    FULL: "Full",
-    NOT_ACCEPTING_PASSENGERS: "Not accepting passengers",
-    NO_DATA_AVAILABLE: null,
-    NOT_BOARDABLE: "Not boardable",
-    UNKNOWN: null,
-  };
-  return occupancyMap[status] !== undefined ? occupancyMap[status] : null;
-};
-
-const findVehicleType = (routeType?: number | string): string => {
-  if (routeType == null) return "unknown";
-  const rt = typeof routeType === "string" ? Number(routeType) : routeType;
-  if (Number.isNaN(rt)) return "unknown";
-  if (rt === 900) return "lightrail";
-  if (rt >= 700 && rt < 800) return "bus";
-  if (rt >= 100 && rt < 200) return "rail";
-  if (rt === 0) return "tram";
-  if (rt === 1) return "metro";
-  if (rt === 4) return "ferry";
-
-  return "other";
-};
+import { findVehicleType, formatKmh, translateOccupancyStatus } from "../utils/helpers";
 
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
