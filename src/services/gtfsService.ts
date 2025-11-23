@@ -99,9 +99,9 @@ class GtfsService {
       console.error("This application requires GTFS static data to function.");
       console.error("\nTo fix this:");
       console.error(
-        "1. Download the HSL-gtfs.zip from: https://api.digitransit.fi/routing-data/v3/finland"
+        "1. Download the HSL-gtfs.zip from: https://api.digitransit.fi/routing-data/v3/hsl/HSL-gtfs.zip"
       );
-      console.error("2. Extract the files to the gtfs-static folder");
+      console.error("2. Create a gtfs-static folder to the root of this project and extract the files to that folder");
       console.error("3. Restart the server\n");
 
       if (error instanceof Error) {

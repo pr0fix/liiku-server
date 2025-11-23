@@ -4,7 +4,7 @@ import { REALTIME_API_URL } from "../utils/constants";
 import gtfsService from "./gtfsService";
 import { VehicleInfo } from "../utils/types";
 import { TransitAPIError } from "../utils/errors";
-import { formatKmh } from "../utils/helpers";
+import { findVehicleType, formatKmh, normalizeRouteId } from "../utils/helpers";
 
 const translateOccupancyStatus = (status: string): string | null => {
   const occupancyMap: Record<string, string | null> = {
@@ -22,18 +22,6 @@ const translateOccupancyStatus = (status: string): string | null => {
   return occupancyMap[status] !== undefined ? occupancyMap[status] : null;
 };
 
-const findVehicleType = (routeType?: number | string): string => {
-  if (routeType == null) return "unknown";
-  const rt = typeof routeType === "string" ? Number(routeType) : routeType;
-  if (Number.isNaN(rt)) return "unknown";
-  if (rt >= 700 && rt < 800) return "bus";
-  if (rt >= 100 && rt < 200) return "rail";
-  if (rt === 0) return "tram";
-  if (rt === 1) return "metro";
-  if (rt === 4) return "ferry";
-
-  return "other";
-};
 
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
@@ -68,7 +56,7 @@ const getVehiclePositions = async (): Promise<VehicleInfo[]> => {
   feed.entity.forEach((entity) => {
     if (entity.vehicle) {
       const v = entity.vehicle;
-      const routeId = v.trip?.routeId || "";
+      const routeId = normalizeRouteId(v.trip?.routeId) || "";
       const stopId = v.stopId || "";
       const directionId = v.trip?.directionId || 0;
       const speedMs = v.position?.speed || 0;
