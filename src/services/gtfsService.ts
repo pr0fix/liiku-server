@@ -1,12 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
-import { Route, Stop, Trip } from "../utils/types";
+import { Route, Shape, Stop, Trip } from "../utils/types";
 
 class GtfsService {
   private routes: Map<string, Route> = new Map();
   private stops: Map<string, Stop> = new Map();
   private trips: Map<string, Trip> = new Map();
+  private shapes: Map<string, Shape[]> = new Map();
   private tripsByRouteDirection: Map<string, Trip> = new Map();
   private isLoaded: boolean = false;
 
@@ -92,6 +93,31 @@ class GtfsService {
         throw error;
       }
 
+      try {
+        const shapesPath = path.join(gtfsPath, "shapes.txt");
+        if (!fs.existsSync(shapesPath)) {
+          throw new Error(`shapes.txt not found at ${shapesPath}`);
+        }
+        const shapesData = fs.readFileSync(shapesPath, "utf-8");
+        const shapes = parse(shapesData, {
+          columns: true,
+          skip_empty_lines: true,
+        }) as Shape[];
+        shapes.forEach((shape) => {
+          if (!this.shapes.has(shape.shape_id)) {
+            this.shapes.set(shape.shape_id, []);
+          }
+          this.shapes.get(shape.shape_id)!.push(shape);
+        });
+        this.shapes.forEach((points) => {
+          points.sort((a, b) => Number(a.shape_pt_sequence) - Number(b.shape_pt_sequence));
+        });
+        console.log(`Loaded ${this.shapes.size} shapes`);
+      } catch (error) {
+        console.error("Failed to load shapes.txt:", error);
+        throw error;
+      }
+
       this.isLoaded = true;
       console.log("GTFS data loaded successfully");
     } catch (error) {
@@ -101,7 +127,9 @@ class GtfsService {
       console.error(
         "1. Download the HSL-gtfs.zip from: https://api.digitransit.fi/routing-data/v3/hsl/HSL-gtfs.zip"
       );
-      console.error("2. Create a gtfs-static folder to the root of this project and extract the files to that folder");
+      console.error(
+        "2. Create a gtfs-static folder to the root of this project and extract the files to that folder"
+      );
       console.error("3. Restart the server\n");
 
       if (error instanceof Error) {
@@ -135,6 +163,18 @@ class GtfsService {
     }
     const compositeKey = `${routeId}:${directionId}`;
     return this.tripsByRouteDirection.get(compositeKey);
+  }
+
+  getShapeForTrip(routeId: string, directionId: number): Shape[] | undefined {
+    if (!this.isLoaded) {
+      console.warn("GTFS data not loaded yet...");
+      return undefined;
+    }
+    const trip = this.getTrip(routeId, directionId);
+    if (!trip?.shape_id) {
+      return undefined;
+    }
+    return this.shapes.get(trip.shape_id);
   }
 
   isDataLoaded(): boolean {

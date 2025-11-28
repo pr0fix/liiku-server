@@ -47,10 +47,7 @@ router.get("/test", async (_req: Request, res: Response): Promise<void> => {
 
 router.get(
   "/transit",
-  async (
-    _req: Request,
-    res: Response<SuccessResponse | ErrorResponse>
-  ): Promise<void> => {
+  async (_req: Request, res: Response<SuccessResponse | ErrorResponse>): Promise<void> => {
     try {
       const data = await transitService.getVehiclePositions();
 
@@ -75,10 +72,7 @@ router.get(
       }
 
       if (error instanceof Error) {
-        if (
-          error.message.includes("ECONNREFUSED") ||
-          error.message.includes("ETIMEDOUT")
-        ) {
+        if (error.message.includes("ECONNREFUSED") || error.message.includes("ETIMEDOUT")) {
           res.status(503).json({
             error: "Service unavailable",
             message: "Unable to connect to realtime data service",

@@ -1,3 +1,5 @@
+import { H_TRAM_ROUTES } from "./constants";
+
 export const msToKmh = (ms?: number | null): number => {
   if (ms == null || Number.isNaN(ms)) return 0;
   return ms * 3.6;
@@ -25,7 +27,7 @@ export const findVehicleType = (routeType?: number | string): string => {
 export const normalizeRouteId = (routeId: string | null | undefined): string => {
   if (!routeId) return "";
 
-  if (routeId === "100HE" || routeId === "100HI") {
+  if (H_TRAM_ROUTES.includes(routeId)) {
     return "H";
   }
 

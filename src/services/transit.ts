@@ -22,7 +22,6 @@ const translateOccupancyStatus = (status: string): string | null => {
   return occupancyMap[status] !== undefined ? occupancyMap[status] : null;
 };
 
-
 const fetchRealtimeData = async (): Promise<transit_realtime.FeedMessage> => {
   try {
     const response = await axios({

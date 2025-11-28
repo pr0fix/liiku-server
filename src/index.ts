@@ -3,6 +3,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import cors from "cors";
 import "dotenv/config";
 import transitRouter from "./routes/transit";
+import shapeRouter from "./routes/shape";
 import transitService from "./services/transit";
 import { PORT } from "./utils/constants";
 import { VehicleInfo } from "./utils/types";
@@ -88,9 +89,7 @@ process.on("SIGTERM", () => {
 async function sendInitialData(ws: WebSocket) {
   try {
     const vehicles = await transitService.getVehiclePositions();
-    ws.send(
-      JSON.stringify({ type: "initial", data: vehicles, timestamp: Date.now() })
-    );
+    ws.send(JSON.stringify({ type: "initial", data: vehicles, timestamp: Date.now() }));
   } catch (error) {
     console.error("Error sending initial data:", error);
     if (ws.readyState === WebSocket.OPEN) {
@@ -134,11 +133,7 @@ async function fetchAndBroadcastUpdates() {
     });
 
     // Only broadcast if there are changes
-    if (
-      changes.updated.length > 0 ||
-      changes.added.length > 0 ||
-      changes.removed.length > 0
-    ) {
+    if (changes.updated.length > 0 || changes.added.length > 0 || changes.removed.length > 0) {
       broadcast({ type: "update", data: changes, timestamp: Date.now() });
 
       console.log(
@@ -167,7 +162,11 @@ function hasVehicleChanged(prev: VehicleInfo, curr: VehicleInfo): boolean {
 }
 
 type BroadcastMessage =
-  | { type: "update"; data: { updated: VehicleInfo[]; added: VehicleInfo[]; removed: string[] }; timestamp: number }
+  | {
+      type: "update";
+      data: { updated: VehicleInfo[]; added: VehicleInfo[]; removed: string[] };
+      timestamp: number;
+    }
   | { type: "error"; message: string }
   | { type: "initial"; data?: any; message?: string; timestamp?: number };
 
@@ -200,4 +199,4 @@ function handleClientMessage(ws: WebSocket, data: ClientMessage) {
 
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
-app.use("/api", transitRouter);
+app.use("/api", [transitRouter, shapeRouter]);

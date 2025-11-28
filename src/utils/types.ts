@@ -15,7 +15,7 @@ interface VehicleInfo {
   currentStatus: string;
   occupancyStatus: string | null;
   startTime: string;
-  vehicleType: string
+  vehicleType: string;
 }
 
 interface Route {
@@ -38,9 +38,27 @@ interface Stop {
 
 interface Trip {
   trip_id: string;
+  shape_id: string;
   route_id: string;
   trip_headsign: string;
   direction_id: number;
 }
 
-export { VehicleInfo, Route, Stop, Trip };
+interface Shape {
+  shape_id: string;
+  shape_pt_lat: number;
+  shape_pt_lon: number;
+  shape_pt_sequence: number;
+  shape_dist_traveled: number;
+}
+
+interface RouteShape {
+  routeId: string;
+  directionId: string;
+  coordinates: {
+    lat: number;
+    lon: number;
+  };
+}
+
+export { VehicleInfo, Route, Stop, Trip, Shape, RouteShape };
