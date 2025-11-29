@@ -1,18 +1,31 @@
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
-import { Route, Shape, Stop, Trip } from "../utils/types";
+import { Emission, Route, Shape, Stop, Trip } from "../utils/types";
 
 class GtfsService {
   private routes: Map<string, Route> = new Map();
   private stops: Map<string, Stop> = new Map();
   private trips: Map<string, Trip> = new Map();
   private shapes: Map<string, Shape[]> = new Map();
+  private emissions: Map<string, Emission> = new Map();
   private tripsByRouteDirection: Map<string, Trip> = new Map();
   private isLoaded: boolean = false;
 
   constructor() {
     this.loadData();
+  }
+
+  private loadFile<T>(gtfsPath: string, fileName: string): T[] {
+    const filePath = path.join(gtfsPath, fileName);
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`${fileName} not found at ${filePath}`);
+    }
+    const fileData = fs.readFileSync(filePath, "utf-8");
+    return parse(fileData, {
+      columns: true,
+      skip_empty_lines: true,
+    }) as T[];
   }
 
   private loadData() {
@@ -27,96 +40,43 @@ class GtfsService {
       }
 
       // Load routes
-      try {
-        const routesPath = path.join(gtfsPath, "routes.txt");
-        if (!fs.existsSync(routesPath)) {
-          throw new Error(`routes.txt not found at ${routesPath}`);
-        }
-        const routesData = fs.readFileSync(routesPath, "utf-8");
-        const routes = parse(routesData, {
-          columns: true,
-          skip_empty_lines: true,
-        }) as Route[];
-        routes.forEach((route) => {
-          this.routes.set(route.route_id, route);
-        });
-        console.log(`Loaded ${this.routes.size} routes`);
-      } catch (error) {
-        console.error("Failed to load routes.txt:", error);
-        throw error;
-      }
+      const routes = this.loadFile<Route>(gtfsPath, "routes.txt");
+      routes.forEach((route) => this.routes.set(route.route_id, route));
+      console.log(`Loaded ${this.routes.size} routes`);
 
       // Load stops
-      try {
-        const stopsPath = path.join(gtfsPath, "stops.txt");
-        if (!fs.existsSync(stopsPath)) {
-          throw new Error(`stops.txt not found at: ${stopsPath}`);
-        }
-        const stopsData = fs.readFileSync(stopsPath, "utf-8");
-        const stops = parse(stopsData, {
-          columns: true,
-          skip_empty_lines: true,
-        }) as Stop[];
-        stops.forEach((stop) => {
-          this.stops.set(stop.stop_id, stop);
-        });
-        console.log(`Loaded ${this.stops.size} stops`);
-      } catch (error) {
-        console.error("Failed to load stops.txt:", error);
-        throw error;
-      }
+      const stops = this.loadFile<Stop>(gtfsPath, "stops.txt");
+      stops.forEach((stop) => this.stops.set(stop.stop_id, stop));
+      console.log(`Loaded ${this.stops.size} stops`);
 
-      // load trips
-      try {
-        const tripsPath = path.join(gtfsPath, "trips.txt");
-        if (!fs.existsSync(tripsPath)) {
-          throw new Error(`trips.txt not found at: ${tripsPath}`);
+      // Load trips
+      const trips = this.loadFile<Trip>(gtfsPath, "trips.txt");
+      trips.forEach((trip) => {
+        this.trips.set(trip.trip_id, trip);
+        const compositeKey = `${trip.route_id}:${trip.direction_id}`;
+        if (!this.tripsByRouteDirection.has(compositeKey)) {
+          this.tripsByRouteDirection.set(compositeKey, trip);
         }
-        const tripsData = fs.readFileSync(tripsPath, "utf-8");
-        const trips = parse(tripsData, {
-          columns: true,
-          skip_empty_lines: true,
-        }) as Trip[];
-        trips.forEach((trip) => {
-          this.trips.set(trip.trip_id, trip);
+      });
+      console.log(`Loaded ${this.trips.size} trips`);
 
-          // Create composite key for route + direction lookup for better performance
-          const compositeKey = `${trip.route_id}:${trip.direction_id}`;
-          // Store the first trip found for this route+direction combination
-          if (!this.tripsByRouteDirection.has(compositeKey)) {
-            this.tripsByRouteDirection.set(compositeKey, trip);
-          }
-        });
-        console.log(`Loaded ${this.trips.size} trips`);
-      } catch (error) {
-        console.error("Failed to load trips.txt:", error);
-        throw error;
-      }
-
-      try {
-        const shapesPath = path.join(gtfsPath, "shapes.txt");
-        if (!fs.existsSync(shapesPath)) {
-          throw new Error(`shapes.txt not found at ${shapesPath}`);
+      // Load shapes
+      const shapes = this.loadFile<Shape>(gtfsPath, "shapes.txt");
+      shapes.forEach((shape) => {
+        if (!this.shapes.has(shape.shape_id)) {
+          this.shapes.set(shape.shape_id, []);
         }
-        const shapesData = fs.readFileSync(shapesPath, "utf-8");
-        const shapes = parse(shapesData, {
-          columns: true,
-          skip_empty_lines: true,
-        }) as Shape[];
-        shapes.forEach((shape) => {
-          if (!this.shapes.has(shape.shape_id)) {
-            this.shapes.set(shape.shape_id, []);
-          }
-          this.shapes.get(shape.shape_id)!.push(shape);
-        });
-        this.shapes.forEach((points) => {
-          points.sort((a, b) => Number(a.shape_pt_sequence) - Number(b.shape_pt_sequence));
-        });
-        console.log(`Loaded ${this.shapes.size} shapes`);
-      } catch (error) {
-        console.error("Failed to load shapes.txt:", error);
-        throw error;
-      }
+        this.shapes.get(shape.shape_id)!.push(shape);
+      });
+      this.shapes.forEach((points) => {
+        points.sort((a, b) => Number(a.shape_pt_sequence) - Number(b.shape_pt_sequence));
+      });
+      console.log(`Loaded ${this.shapes.size} shapes`);
+
+      // Load emissions
+      const emissions = this.loadFile<Emission>(gtfsPath, "emissions.txt");
+      emissions.forEach((emission) => this.emissions.set(emission.route_id, emission));
+      console.log(`Loaded emissions data for ${this.emissions.size} vehicles.`);
 
       this.isLoaded = true;
       console.log("GTFS data loaded successfully");
@@ -167,7 +127,7 @@ class GtfsService {
 
   getShapeForTrip(routeId: string, directionId: number): Shape[] | undefined {
     if (!this.isLoaded) {
-      console.warn("GTFS data not loaded yet...");
+      console.warn("GTFS shapes-data not loaded yet...");
       return undefined;
     }
     const trip = this.getTrip(routeId, directionId);
@@ -175,6 +135,14 @@ class GtfsService {
       return undefined;
     }
     return this.shapes.get(trip.shape_id);
+  }
+
+  getEmissions(routeId: string): Emission | undefined {
+    if (!this.isLoaded) {
+      console.warn("GTFS emissions-data not loaded yet...");
+      return undefined;
+    }
+    return this.emissions.get(routeId);
   }
 
   isDataLoaded(): boolean {

@@ -4,6 +4,7 @@ import cors from "cors";
 import "dotenv/config";
 import transitRouter from "./routes/transit";
 import shapeRouter from "./routes/shape";
+import emissionRouter from "./routes/emission";
 import transitService from "./services/transit";
 import { PORT } from "./utils/constants";
 import { VehicleInfo } from "./utils/types";
@@ -199,4 +200,4 @@ function handleClientMessage(ws: WebSocket, data: ClientMessage) {
 
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
-app.use("/api", [transitRouter, shapeRouter]);
+app.use("/api", [transitRouter, shapeRouter, emissionRouter]);
