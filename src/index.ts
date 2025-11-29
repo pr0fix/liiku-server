@@ -8,12 +8,21 @@ import emissionRouter from "./routes/emission";
 import transitService from "./services/transit";
 import { PORT } from "./utils/constants";
 import { VehicleInfo } from "./utils/types";
+import { rateLimiter, securityHeaders } from "./utils/middleware";
 
 interface ExtendedWebSocket extends WebSocket {
   isAlive: boolean;
 }
 
 const app = express();
+
+app.disable("x-powered-by");
+app.use(securityHeaders);
+app.use(cors({ origin: "http://localhost:5173" }));
+app.use(rateLimiter(100, 15 * 60 * 1000));
+app.use(express.json({ limit: "10kb" }));
+app.use("/api", [transitRouter, shapeRouter, emissionRouter]);
+
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
@@ -27,8 +36,13 @@ let previousVehicles: Map<string, VehicleInfo> = new Map();
 // Interval to detect dead connections
 const HEARTBEAT_INTERVAL = 30000;
 const UPDATE_INTERVAL = 10000;
+const MAX_CONNECTIONS = 100;
 
-wss.on("connection", function connection(ws: ExtendedWebSocket) {
+wss.on("connection", function connection(ws: ExtendedWebSocket, req) {
+  if (clients.size >= MAX_CONNECTIONS) {
+    ws.close(1013, "Server at capacity");
+    return;
+  }
   console.log("New client connected");
   ws.isAlive = true;
   clients.add(ws);
@@ -197,7 +211,3 @@ function handleClientMessage(ws: WebSocket, data: ClientMessage) {
       console.log("Unknown message type:", data.type);
   }
 }
-
-app.use(cors({ origin: "http://localhost:5173" }));
-app.use(express.json());
-app.use("/api", [transitRouter, shapeRouter, emissionRouter]);
