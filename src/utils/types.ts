@@ -65,9 +65,9 @@ interface Emission {
   route_id: string;
   agency_id: string;
   route_short_name: string;
-  type: string;
-  avg_co2: number;
-  avg_passengers: number;
+  Type: string;
+  avg_co2_per_vehicle_per_km: number;
+  avg_passenger_count: number;
 }
 
 export { VehicleInfo, Route, Stop, Trip, Shape, RouteShape, Emission };
