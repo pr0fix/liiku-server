@@ -1,10 +1,10 @@
-## Liiku Server
+## liiku-server
 
-Backend API service for the Liiku real-time public transport visualization application. Provides vehicle positions, route shapes and transit data for the Helsinki metropolitan area.
+Backend API service for the liiku real-time public transport visualization application. Provides vehicle positions, route shapes and transit data for the Helsinki metropolitan area.
 
 ## Overview
 
-Liiku Server processes GTFS static data and real-time vehicle positions from the Digitransit API, exposing endpoints for the Liiku Client application.
+liiku-server processes GTFS static data and real-time vehicle positions from the Digitransit API, exposing endpoints for the liiku-client application.
 
 ## Features
 
