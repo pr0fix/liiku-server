@@ -10,9 +10,11 @@ liiku-server processes GTFS static data and real-time vehicle positions from the
 
 - **Real-time vehicle positions** — Fetches and serves live GTFS-RT vehicle data
 - **Route shapes** — Provides polyline geometries for route visualization
+- **Stop information** — Detailed stop locations and departure schedules
 - **Emissions data** — Vehicle emissions information
 - **Static transit data** — Processes and serves GTFS static data
-- **Efficient caching** — Optimized data structures for fast lookups
+- **Efficient database indexing** — SQLite for fast queries
+- **Optimized caching** — Data structures and indexes for fast lookups
 
 ## Tech Stack
 
@@ -20,6 +22,7 @@ liiku-server processes GTFS static data and real-time vehicle positions from the
 | -------- | -------------------------- |
 | Runtime  | Node.js                    |
 | Language | TypeScript                 |
+| Database | SQLite (better-sqlite3)    |
 | Data     | Digitransit GTFS / GTFS-RT |
 
 ## Getting Started
@@ -59,6 +62,8 @@ liiku-server processes GTFS static data and real-time vehicle positions from the
    npm start
    ```
 
+**Note:** The first startup will take 1-2 minutes to build the SQLite database from `stop_times.txt`. This only happens once; subsequent restarts are instant.
+
 ### Scripts
 
 | Command         | Description                              |
@@ -70,11 +75,34 @@ liiku-server processes GTFS static data and real-time vehicle positions from the
 
 ## API Endpoints
 
-| Endpoint                     | Method | Description                       |
+#### Vehicle Positions
+| Endpoint | Method | Description |
 | ---------------------------- | ------ | --------------------------------- |
-| `/api/vehicles`              | GET    | Returns current vehicle positions |
-| `/api/routes/:routeId/shape` | GET    | Returns route polyline geometry   |
-| `/api/emission/:routeId`     | GET    | Returns route emission data       |
+| `/api/vehicles` | GET | Returns current vehicle positions |
+
+#### Routes & Shapes
+| Endpoint | Method | Description |
+| ---------------------------- | ------ | --------------------------------- |
+| `/api/routes/:routeId/shape` | GET | Returns route polyline geometry |
+
+#### Stops
+| Endpoint | Method | Description |
+| ---------------------------- | ------ | --------------------------------- |
+| `/api/stops` | GET | Returns all stops |
+| `/api/routes/:routeId/shape` | GET | Returns stops within map bounds |
+| `/api/stops/:stopId` | GET | Returns stop details with next 50 departures |
+| `/api/stops/route/:routeId/:directionId	` | GET | Returns all stops for a specific route |
+
+### Stop bounds query parameters:
+
+```sh
+?minLat=60.15&maxLat=60.20&minLon=24.90&maxLon=25.00
+```
+
+#### Emissions
+| Endpoint | Method | Description |
+| ---------------------------- | ------ | --------------------------------- |
+| `/api/emission/:routeId` | GET | Returns route emission data |
 
 ## Project Structure
 
@@ -83,11 +111,13 @@ src/
 ├── routes/
 │   ├── emission.ts          # Emissions API routes
 │   ├── shape.ts             # Route shape API routes
+│   ├── stop.ts              # Stop information API routes
 │   └── transit.ts           # Vehicle position API routes
 ├── services/
 │   ├── emission.ts          # Emissions data processing
 │   ├── gtfsService.ts       # GTFS static data loader
 │   ├── shape.ts             # Route shape processing
+│   ├── stop.ts              # Stop information processing
 │   └── transit.ts           # Real-time vehicle processing
 ├── utils/
 │   ├── constants.ts         # Configuration constants
