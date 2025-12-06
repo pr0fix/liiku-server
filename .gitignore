@@ -4,3 +4,6 @@ node_modules
 # GTFS Static data
 gfts-static
 *.txt
+
+# DB
+gtfs.db

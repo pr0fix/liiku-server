@@ -36,6 +36,16 @@ interface Stop {
   stop_url: string;
 }
 
+interface StopTime {
+  trip_id: string;
+  arrival_time: string;
+  departure_time: string;
+  stop_id: string;
+  stop_sequence: string;
+  pickup_type?: string;
+  drop_off_type?: string;
+}
+
 interface Trip {
   trip_id: string;
   shape_id: string;
@@ -70,4 +80,29 @@ interface Emission {
   avg_passenger_count: number;
 }
 
-export { VehicleInfo, Route, Stop, Trip, Shape, RouteShape, Emission };
+type BroadcastMessage =
+  | {
+      type: "update";
+      data: { updated: VehicleInfo[]; added: VehicleInfo[]; removed: string[] };
+      timestamp: number;
+    }
+  | { type: "error"; message: string }
+  | { type: "initial"; data?: any; message?: string; timestamp?: number };
+
+interface ClientMessage {
+  type: "ping" | "subscribe" | string;
+  payload?: any;
+}
+
+export {
+  VehicleInfo,
+  Route,
+  Stop,
+  StopTime,
+  Trip,
+  Shape,
+  RouteShape,
+  Emission,
+  BroadcastMessage,
+  ClientMessage,
+};
