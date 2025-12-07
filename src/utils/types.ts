@@ -52,6 +52,7 @@ interface Trip {
   route_id: string;
   trip_headsign: string;
   direction_id: number;
+  service_id: string;
 }
 
 interface Shape {
@@ -80,6 +81,25 @@ interface Emission {
   avg_passenger_count: number;
 }
 
+interface Calendar {
+  service_id: string;
+  monday: string;
+  tuesday: string;
+  wednesday: string;
+  thursday: string;
+  friday: string;
+  saturday: string;
+  sunday: string;
+  start_date: string;
+  end_date: string;
+}
+
+interface CalendarDate {
+  service_id: string;
+  date: string;
+  exception_type: string; // 1 = added, 2 = removed
+}
+
 type BroadcastMessage =
   | {
       type: "update";
@@ -103,6 +123,8 @@ export {
   Shape,
   RouteShape,
   Emission,
+  Calendar,
+  CalendarDate,
   BroadcastMessage,
   ClientMessage,
 };

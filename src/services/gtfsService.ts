@@ -2,7 +2,16 @@ import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
 import Database from "better-sqlite3";
-import { Emission, Route, Shape, Stop, StopTime, Trip } from "../utils/types";
+import {
+  Calendar,
+  CalendarDate,
+  Emission,
+  Route,
+  Shape,
+  Stop,
+  StopTime,
+  Trip,
+} from "../utils/types";
 import csvParser from "csv-parser";
 
 class GtfsService {
@@ -11,6 +20,8 @@ class GtfsService {
   private trips: Map<string, Trip> = new Map();
   private shapes: Map<string, Shape[]> = new Map();
   private emissions: Map<string, Emission> = new Map();
+  private calendars: Map<string, Calendar> = new Map();
+  private calendarDates: Map<string, CalendarDate[]> = new Map();
   private tripsByRouteDirection: Map<string, Trip> = new Map();
   private db: Database.Database;
   private gtfsPath: string = path.join(__dirname, "../../gtfs-static");
@@ -167,6 +178,22 @@ class GtfsService {
       );
       console.log(`Loaded emissions data for ${this.emissions.size} vehicles.`);
 
+      // Load calendars
+      const calendars = this.loadFile<Calendar>(this.gtfsPath, "calendar.txt");
+      calendars.forEach((cal) => this.calendars.set(cal.service_id, cal));
+
+      // Load calendar dates
+      const calendarDates = this.loadFile<CalendarDate>(
+        this.gtfsPath,
+        "calendar_dates.txt"
+      );
+      calendarDates.forEach((cd) => {
+        if (!this.calendarDates.has(cd.service_id)) {
+          this.calendarDates.set(cd.service_id, []);
+        }
+        this.calendarDates.get(cd.service_id)!.push(cd);
+      });
+
       // Initialize database for stop_times (streaming)
       await this.initDatabase();
 
@@ -190,6 +217,43 @@ class GtfsService {
 
       process.exit(1);
     }
+  }
+
+  private isServiceActiveToday(serviceId: string): boolean {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+
+    // Check calendar_dates exceptions first
+    const exceptions = this.calendarDates.get(serviceId);
+    if (exceptions) {
+      const todayException = exceptions.find((ex) => ex.date === dateStr);
+      if (todayException) {
+        return todayException.exception_type === "1"; // 1 = service added
+      }
+    }
+
+    // Check regular calendar
+    const calendar = this.calendars.get(serviceId);
+    if (!calendar) return false;
+
+    // Check date range
+    if (dateStr < calendar.start_date || dateStr > calendar.end_date) {
+      return false;
+    }
+
+    // Check day of week
+    const days = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayField = days[dayOfWeek] as keyof Calendar;
+    return calendar[dayField] === "1";
   }
 
   // Get route by id
@@ -261,20 +325,35 @@ class GtfsService {
     headsign: string;
     departure_time: string;
   }> {
-    const stopTimes = this.db
-      .prepare("SELECT * FROM stop_times WHERE stop_id = ? LIMIT 50")
-      .all(stopId) as StopTime[];
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 
-    return stopTimes.map((st) => {
-      const trip = this.trips.get(st.trip_id);
-      const route = trip ? this.routes.get(trip.route_id) : undefined;
-      return {
-        route_id: trip?.route_id || "",
-        route_name: route?.route_short_name || "",
-        headsign: trip?.trip_headsign || "",
-        departure_time: st.departure_time,
-      };
-    });
+    const stopTimes = this.db
+      .prepare(
+        `SELECT * FROM stop_times 
+        WHERE stop_id = ? 
+        AND departure_time >= ? 
+        ORDER BY departure_time
+      `
+      )
+      .all(stopId, currentTime) as StopTime[];
+
+    return stopTimes
+      .filter((st) => {
+        const trip = this.trips.get(st.trip_id);
+        if (!trip) return false;
+        return this.isServiceActiveToday(trip.service_id);
+      })
+      .map((st) => {
+        const trip = this.trips.get(st.trip_id);
+        const route = trip ? this.routes.get(trip.route_id) : undefined;
+        return {
+          route_id: trip?.route_id || "",
+          route_name: route?.route_short_name || "",
+          headsign: trip?.trip_headsign || "",
+          departure_time: st.departure_time,
+        };
+      });
   }
 
   // Get specific route by direction
