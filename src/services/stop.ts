@@ -46,7 +46,7 @@ const getStopWithDepartures = async (stopId: string) => {
 };
 
 const getStopsForRoute = async (routeId: string, directionId: number) => {
-  const stops = gtfsService.getStopsForRoute(routeId, directionId);
+  const stops = await gtfsService.getStopsForRoute(routeId, directionId);
   if (!stops) return [];
 
   return stops?.map((stop) => ({

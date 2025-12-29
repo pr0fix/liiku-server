@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
-import Database from "better-sqlite3";
+import { Pool } from "pg";
 import {
   Calendar,
   CalendarDate,
@@ -23,13 +23,14 @@ class GtfsService {
   private calendars: Map<string, Calendar> = new Map();
   private calendarDates: Map<string, CalendarDate[]> = new Map();
   private tripsByRouteDirection: Map<string, Trip> = new Map();
-  private db: Database.Database;
+  private pool: Pool;
   private gtfsPath: string = path.join(__dirname, "../../gtfs-static");
-  private dbPath: string = path.join(__dirname, "../../gtfs.db");
   private isLoaded: boolean = false;
 
   constructor() {
-    this.db = new Database(this.dbPath);
+    this.pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+    });
     this.loadData();
   }
 
@@ -47,48 +48,37 @@ class GtfsService {
 
   // Initialize database for getting stop_times with faster performance
   private async initDatabase(): Promise<void> {
-    // Create stop_times table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS stop_times (
-        trip_id TEXT,
-        arrival_time TEXT,
-        departure_time TEXT,
-        stop_id TEXT,
-        stop_sequence INTEGER,
-        pickup_type INTEGER,
-        drop_off_type INTEGER
-      );
-      CREATE INDEX IF NOT EXISTS idx_stop_times_trip ON stop_times(trip_id);
-      CREATE INDEX IF NOT EXISTS idx_stop_times_stop ON stop_times(stop_id);
-    `);
+    const client = await this.pool.connect();
 
-    // Check if data already loaded
-    const count = this.db
-      .prepare("SELECT COUNT(*) as count FROM stop_times")
-      .get() as { count: number };
+    try {
+      // Check if data already loaded
+      const result = await client.query("SELECT COUNT(*) as count FROM stop_times");
+      const count = parseInt(result.rows[0].count);
 
-    if (count.count > 0) {
-      console.log("stop_times already loaded in database");
-      return;
-    }
+      if (count > 0) {
+        console.log("stop_times already loaded in database");
+        return;
+      }
 
-    console.log("Loading stop_times into database...");
+      console.log("Loading stop_times into database...");
 
-    return new Promise((resolve, reject) => {
       const filePath = path.join(this.gtfsPath, "stop_times.txt");
-
-      const insert = this.db.prepare(`
-        INSERT INTO stop_times (trip_id, arrival_time, departure_time, stop_id, stop_sequence, pickup_type, drop_off_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      let count = 0;
-      const batchSize = 10000;
+      let rowCount = 0;
+      const batchSize = 5000;
       let batch: StopTime[] = [];
 
-      const insertBatch = this.db.transaction((rows: StopTime[]) => {
-        for (const row of rows) {
-          insert.run(
+      const insertBatch = async (rows: StopTime[]) => {
+        if (rows.length === 0) return;
+
+        const values: any[] = [];
+        const placeholders: string[] = [];
+
+        rows.forEach((row, index) => {
+          const offset = index * 7;
+          placeholders.push(
+            `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`
+          );
+          values.push(
             row.trip_id,
             row.arrival_time,
             row.departure_time,
@@ -97,32 +87,51 @@ class GtfsService {
             row.pickup_type || null,
             row.drop_off_type || null
           );
-        }
-      });
+        });
 
-      fs.createReadStream(filePath)
-        .pipe(csvParser({ mapHeaders: ({ header }) => header.trim() }))
-        .on("data", (row) => {
-          batch.push(row);
-          count++;
+        await client.query(
+          `INSERT INTO stop_times (trip_id, arrival_time, departure_time, stop_id, stop_sequence, pickup_type, drop_off_type)
+           VALUES ${placeholders.join(", ")}`,
+          values
+        );
+      };
 
-          if (batch.length >= batchSize) {
-            insertBatch(batch);
-            batch = [];
-            if (count % 100000 === 0) {
-              console.log(`Loaded ${count} stop_times...`);
+      return new Promise((resolve, reject) => {
+        fs.createReadStream(filePath)
+          .pipe(csvParser({ mapHeaders: ({ header }) => header.trim() }))
+          .on("data", async (row) => {
+            batch.push(row);
+            rowCount++;
+
+            if (batch.length >= batchSize) {
+              const currentBatch = [...batch];
+              batch = [];
+              try {
+                await insertBatch(currentBatch);
+                if (rowCount % 100000 === 0) {
+                  console.log(`Loaded ${rowCount} stop_times...`);
+                }
+              } catch (err) {
+                reject(err);
+              }
             }
-          }
-        })
-        .on("end", () => {
-          if (batch.length > 0) {
-            insertBatch(batch);
-          }
-          console.log(`Loaded ${count} stop_times into database`);
-          resolve();
-        })
-        .on("error", reject);
-    });
+          })
+          .on("end", async () => {
+            try {
+              if (batch.length > 0) {
+                await insertBatch(batch);
+              }
+              console.log(`Loaded ${rowCount} stop_times into database`);
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          })
+          .on("error", reject);
+      });
+    } finally {
+      client.release();
+    }
   }
 
   // Load data from gtfs-files
@@ -165,17 +174,13 @@ class GtfsService {
         this.shapes.get(shape.shape_id)!.push(shape);
       });
       this.shapes.forEach((points) => {
-        points.sort(
-          (a, b) => Number(a.shape_pt_sequence) - Number(b.shape_pt_sequence)
-        );
+        points.sort((a, b) => Number(a.shape_pt_sequence) - Number(b.shape_pt_sequence));
       });
       console.log(`Loaded ${this.shapes.size} shapes`);
 
       // Load emissions
       const emissions = this.loadFile<Emission>(this.gtfsPath, "emissions.txt");
-      emissions.forEach((emission) =>
-        this.emissions.set(emission.route_id, emission)
-      );
+      emissions.forEach((emission) => this.emissions.set(emission.route_id, emission));
       console.log(`Loaded emissions data for ${this.emissions.size} vehicles.`);
 
       // Load calendars
@@ -183,10 +188,7 @@ class GtfsService {
       calendars.forEach((cal) => this.calendars.set(cal.service_id, cal));
 
       // Load calendar dates
-      const calendarDates = this.loadFile<CalendarDate>(
-        this.gtfsPath,
-        "calendar_dates.txt"
-      );
+      const calendarDates = this.loadFile<CalendarDate>(this.gtfsPath, "calendar_dates.txt");
       calendarDates.forEach((cd) => {
         if (!this.calendarDates.has(cd.service_id)) {
           this.calendarDates.set(cd.service_id, []);
@@ -243,15 +245,7 @@ class GtfsService {
     }
 
     // Check day of week
-    const days = [
-      "sunday",
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-    ];
+    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     const dayField = days[dayOfWeek] as keyof Calendar;
     return calendar[dayField] === "1";
   }
@@ -280,7 +274,7 @@ class GtfsService {
   }
 
   // Get all stops for specific trip
-  getStopsForTrip(tripId: string):
+  async getStopsForTrip(tripId: string): Promise<
     | Array<
         Stop & {
           arrival_time: string;
@@ -288,13 +282,14 @@ class GtfsService {
           stop_sequence: number;
         }
       >
-    | undefined {
-    const stopTimes = this.db
-      .prepare(
-        "SELECT * FROM stop_times WHERE trip_id = ? ORDER BY stop_sequence"
-      )
-      .all(tripId) as StopTime[];
+    | undefined
+  > {
+    const result = await this.pool.query(
+      "SELECT * FROM stop_times WHERE trip_id = $1 ORDER BY stop_sequence",
+      [tripId]
+    );
 
+    const stopTimes = result.rows as StopTime[];
     if (!stopTimes || stopTimes.length === 0) return undefined;
 
     return stopTimes.map((st) => {
@@ -309,34 +304,36 @@ class GtfsService {
   }
 
   // Get all stops for specific route and route direction
-  getStopsForRoute(
+  async getStopsForRoute(
     routeId: string,
     directionId: number
-  ): Array<Stop & { arrival_time: string; stop_sequence: number }> | undefined {
+  ): Promise<Array<Stop & { arrival_time: string; stop_sequence: number }> | undefined> {
     const trip = this.getTrip(routeId, directionId);
     if (!trip) return undefined;
     return this.getStopsForTrip(trip.trip_id);
   }
 
   // Get all departures from specific stop
-  getDeparturesForStop(stopId: string): Array<{
-    route_id: string;
-    route_name: string;
-    headsign: string;
-    departure_time: string;
-  }> {
+  async getDeparturesForStop(stopId: string): Promise<
+    Array<{
+      route_id: string;
+      route_name: string;
+      headsign: string;
+      departure_time: string;
+    }>
+  > {
     const now = new Date();
     const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 
-    const stopTimes = this.db
-      .prepare(
-        `SELECT * FROM stop_times 
-        WHERE stop_id = ? 
-        AND departure_time >= ? 
-        ORDER BY departure_time
-      `
-      )
-      .all(stopId, currentTime) as StopTime[];
+    const result = await this.pool.query(
+      `SELECT * FROM stop_times 
+       WHERE stop_id = $1 
+       AND departure_time >= $2 
+       ORDER BY departure_time`,
+      [stopId, currentTime]
+    );
+
+    const stopTimes = result.rows as StopTime[];
 
     return stopTimes
       .filter((st) => {
@@ -391,6 +388,10 @@ class GtfsService {
   // Check if data is loaded
   isDataLoaded(): boolean {
     return this.isLoaded;
+  }
+
+  async close(): Promise<void> {
+    await this.pool.end();
   }
 }
 
